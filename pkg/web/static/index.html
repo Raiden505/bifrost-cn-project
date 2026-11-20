@@ -1,7 +1,318 @@
 <!DOCTYPE html>
-<html>
-<head><title>Bifrost</title></head>
-<body>
-  <h1>Bifrost is running</h1>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bifrost</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<main class="max-w-6xl mx-auto p-6 space-y-6">
+
+  <h1 class="text-2xl font-semibold">Bifrost network diagnostics</h1>
+
+  <!-- Controls -->
+  <section class="bg-white border border-slate-200 rounded-lg p-4">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
+      <div>
+        <label for="server_ip" class="block text-xs text-slate-500 mb-1">Server IP</label>
+        <input id="server_ip" type="text" value="10.0.0.2"
+               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+      </div>
+      <div>
+        <label for="duration" class="block text-xs text-slate-500 mb-1">Duration (s)</label>
+        <input id="duration" type="number" min="1" max="60" value="5"
+               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+      </div>
+      <div>
+        <label for="capacity" class="block text-xs text-slate-500 mb-1">Reference capacity (Mbps)</label>
+        <input id="capacity" type="number" min="1" value="100"
+               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+      </div>
+      <div>
+        <label for="impairment" class="block text-xs text-slate-500 mb-1">Network impairment</label>
+        <select id="impairment" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm bg-white">
+          <option value="none">None (baseline)</option>
+          <option value="rate10">10 Mbps cap</option>
+          <option value="delay50">50 ms delay</option>
+          <option value="loss3">3% packet loss</option>
+          <option value="congestion">Congestion</option>
+          <option value="bufferbloat">Bufferbloat</option>
+        </select>
+      </div>
+      <label class="flex items-center gap-2 text-sm pb-1.5">
+        <input id="bufferbloat" type="checkbox" class="h-4 w-4">
+        Bufferbloat mode (idle vs loaded)
+      </label>
+    </div>
+    <div class="flex gap-3 mt-4">
+      <button id="run" type="button"
+              class="bg-slate-900 text-white text-sm px-4 py-2 rounded hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">
+        Run diagnostic test
+      </button>
+      <button id="download" type="button" disabled
+              class="border border-slate-300 text-sm px-4 py-2 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed">
+        Download JSON
+      </button>
+    </div>
+    <p id="error" class="hidden mt-3 text-sm text-rose-700"></p>
+  </section>
+
+  <p id="empty" class="text-sm text-slate-500">No results yet. Run a test to see the report.</p>
+
+  <!-- Results, hidden until the first report arrives -->
+  <div id="results" class="hidden space-y-6">
+
+    <section id="banner" class="rounded-lg border-l-4 p-5">
+      <h2 id="condition" class="text-lg font-semibold"></h2>
+      <p id="summary" class="mt-1 text-sm"></p>
+      <ul id="explanations" class="mt-3 list-disc pl-5 space-y-1 text-sm"></ul>
+    </section>
+
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <p class="text-xs text-slate-500">Application goodput</p>
+        <p class="text-2xl font-semibold mt-1"><span id="goodput">-</span> <span class="text-sm font-normal text-slate-500">Mbps</span></p>
+        <p id="goodput_sub" class="text-xs text-slate-500 mt-2"></p>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <p class="text-xs text-slate-500">Round-trip time (mean)</p>
+        <p class="text-2xl font-semibold mt-1"><span id="rtt">-</span> <span class="text-sm font-normal text-slate-500">ms</span></p>
+        <p id="rtt_sub" class="text-xs text-slate-500 mt-2"></p>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <p class="text-xs text-slate-500">Jitter (RFC 3550)</p>
+        <p class="text-2xl font-semibold mt-1"><span id="jitter">-</span> <span class="text-sm font-normal text-slate-500">ms</span></p>
+        <p id="jitter_sub" class="text-xs text-slate-500 mt-2"></p>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <p class="text-xs text-slate-500">UDP probe loss</p>
+        <p class="text-2xl font-semibold mt-1"><span id="loss">-</span> <span class="text-sm font-normal text-slate-500">%</span></p>
+        <p id="loss_sub" class="text-xs text-slate-500 mt-2"></p>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <h3 class="text-sm font-medium mb-2">RTT per probe (ms)</h3>
+        <div class="relative h-64"><canvas id="rttChart"></canvas></div>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <h3 class="text-sm font-medium mb-2">TCP goodput over time (Mbps)</h3>
+        <div class="relative h-64"><canvas id="tcpChart"></canvas></div>
+      </div>
+    </section>
+
+    <p id="timestamp" class="text-xs text-slate-400"></p>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let lastReport = null;
+let rttChart = null;
+let tcpChart = null;
+
+const BANNER_STYLES = {
+  healthy:  "bg-emerald-50 border-emerald-500 text-emerald-900",
+  warning:  "bg-amber-50 border-amber-500 text-amber-900",
+  critical: "bg-rose-50 border-rose-500 text-rose-900",
+};
+
+// Formats a number, or shows "-" if the value is missing.
+function fmt(v, digits = 1) {
+  return typeof v === "number" && isFinite(v) ? v.toFixed(digits) : "-";
+}
+
+function readConfig() {
+  const duration = parseInt($("duration").value, 10);
+  const capacity = parseFloat($("capacity").value);
+  return {
+    server_ip: $("server_ip").value.trim() || "10.0.0.2",
+    duration_sec: duration > 0 ? duration : 5,
+    probe_interval_ms: 20,
+    link_capacity_mbps: capacity > 0 ? capacity : 100,
+    bufferbloat_mode: $("bufferbloat").checked,
+    impairment_preset: $("impairment").value,
+  };
+}
+
+function setBusy(busy) {
+  $("run").disabled = busy;
+  $("run").textContent = busy ? "Running..." : "Run diagnostic test";
+}
+
+function showError(msg) {
+  $("error").textContent = msg;
+  $("error").classList.remove("hidden");
+}
+
+function hideError() {
+  $("error").classList.add("hidden");
+}
+
+async function runTest() {
+  setBusy(true);
+  hideError();
+  try {
+    const res = await fetch("/api/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(readConfig()),
+    });
+    if (!res.ok) {
+      const text = (await res.text()).trim();
+      throw new Error(text || "Server returned status " + res.status);
+    }
+    lastReport = await res.json();
+    render(lastReport);
+  } catch (err) {
+    showError("Test failed: " + err.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function render(report) {
+  const stats = report.stats || {};
+  const diag = report.diagnosis || {};
+  const raw = report.raw || {};
+  const cfg = report.config || {};
+
+  $("empty").classList.add("hidden");
+  $("results").classList.remove("hidden");
+  $("download").disabled = false;
+
+  // Verdict banner
+  const style = BANNER_STYLES[diag.severity] || BANNER_STYLES.warning;
+  $("banner").className = "rounded-lg border-l-4 p-5 " + style;
+  $("condition").textContent = diag.condition || "No diagnosis";
+  $("summary").textContent = diag.summary || "";
+  const list = $("explanations");
+  list.replaceChildren();
+  (diag.explanations || []).forEach((text) => {
+    const li = document.createElement("li");
+    li.textContent = text;
+    list.appendChild(li);
+  });
+
+  // Metric cards
+  $("goodput").textContent = fmt(stats.goodput_mbps);
+  $("goodput_sub").textContent =
+    "Utilization: " + fmt(stats.capacity_utilization_pct) + "% | Header overhead: ~" +
+    fmt(stats.estimated_overhead_pct) + "%";
+
+  $("rtt").textContent = fmt(stats.rtt_mean_ms, 2);
+  $("rtt_sub").textContent =
+    "Min: " + fmt(stats.rtt_min_ms, 2) + " | P95: " + fmt(stats.rtt_p95_ms, 2) +
+    " | Max: " + fmt(stats.rtt_max_ms, 2);
+
+  $("jitter").textContent = fmt(stats.jitter_rfc3550_ms, 2);
+  $("jitter_sub").textContent = cfg.bufferbloat_mode
+    ? "Queue inflation: +" + fmt(stats.queueing_inflation_ms, 2) + " ms"
+    : "StdDev: " + fmt(stats.rtt_stddev_ms, 2) + " ms";
+
+  $("loss").textContent = fmt(stats.probe_loss_pct, 2);
+  $("loss_sub").textContent =
+    "Received: " + (stats.probes_received ?? "-") + " / " + (stats.probes_sent ?? "-") + " probes";
+
+  $("timestamp").textContent = report.timestamp ? "Report time: " + report.timestamp : "";
+
+  drawRttChart(raw.udp_samples || []);
+  drawTcpChart(raw.tcp_intervals || []);
+}
+
+function drawRttChart(samples) {
+  const received = samples.filter((s) => !s.lost);
+  const byPhase = (phase) =>
+    received.filter((s) => s.phase === phase).map((s) => ({ x: s.seq_num, y: s.rtt_ms }));
+  // Lost packets have rtt_ms = 0, so they are drawn as red crosses on the x-axis.
+  const lost = samples.filter((s) => s.lost).map((s) => ({ x: s.seq_num, y: 0 }));
+
+  const points = (label, data, color, extra) => Object.assign({
+    label, data, showLine: false,
+    borderColor: color, backgroundColor: color, pointRadius: 3,
+  }, extra || {});
+
+  const datasets = [
+    {
+      label: "Trend",
+      data: received.map((s) => ({ x: s.seq_num, y: s.rtt_ms })),
+      borderColor: "#cbd5e1", borderWidth: 1, pointRadius: 0,
+    },
+    points("Normal", byPhase("normal"), "#64748b"),
+    points("Idle", byPhase("idle"), "#3b82f6"),
+    points("Loaded", byPhase("loaded"), "#f97316"),
+    points("Lost", lost, "#e11d48", { pointStyle: "crossRot", pointRadius: 6, borderWidth: 2 }),
+  ];
+
+  if (rttChart) rttChart.destroy();
+  rttChart = new Chart($("rttChart"), {
+    type: "line",
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: "linear", title: { display: true, text: "Probe number" } },
+        y: { beginAtZero: true, title: { display: true, text: "RTT (ms)" } },
+      },
+      plugins: {
+        legend: {
+          labels: {
+            filter: (item, data) =>
+              item.text !== "Trend" && data.datasets[item.datasetIndex].data.length > 0,
+          },
+        },
+      },
+    },
+  });
+}
+
+function drawTcpChart(intervals) {
+  if (tcpChart) tcpChart.destroy();
+  tcpChart = new Chart($("tcpChart"), {
+    type: "line",
+    data: {
+      datasets: [{
+        label: "Goodput (Mbps)",
+        data: intervals.map((i) => ({ x: i.elapsed_sec, y: i.goodput_mbps })),
+        borderColor: "#0f172a",
+        backgroundColor: "rgba(15, 23, 42, 0.1)",
+        fill: true,
+        tension: 0.2,
+        pointRadius: 3,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: "linear", title: { display: true, text: "Elapsed (s)" } },
+        y: { beginAtZero: true, title: { display: true, text: "Mbps" } },
+      },
+      plugins: { legend: { display: false } },
+    },
+  });
+}
+
+function downloadReport() {
+  if (!lastReport) return;
+  const blob = new Blob([JSON.stringify(lastReport, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "bifrost-report-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+$("run").addEventListener("click", runTest);
+$("download").addEventListener("click", downloadReport);
+</script>
 </body>
 </html>
