@@ -44,6 +44,13 @@ func CalculateStats(cfg models.TestConfig, raw models.RawTestOutput) models.Comp
 
 	}
 
+	stats.ProbesReceived = len(validRTTs)
+
+	if stats.ProbesSent > 0 {
+		lostProbes := stats.ProbesSent - stats.ProbesReceived
+		stats.ProbeLossPct = float64(lostProbes) / float64(stats.ProbesSent) * 100
+	}
+
 	return stats
 
 }
