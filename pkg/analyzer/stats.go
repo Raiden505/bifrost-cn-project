@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"bifrost/pkg/models"
+	"math"
 )
 
 func CalculateStats(cfg models.TestConfig, raw models.RawTestOutput) models.ComputedStats {
@@ -50,6 +51,14 @@ func CalculateStats(cfg models.TestConfig, raw models.RawTestOutput) models.Comp
 		lostProbes := stats.ProbesSent - stats.ProbesReceived
 		stats.ProbeLossPct = float64(lostProbes) / float64(stats.ProbesSent) * 100
 	}
+
+	var jitter float64
+
+	for i := 1; i < len(validRTTs); i++ {
+		diff := math.Abs(validRTTs[i] - validRTTs[i-1])
+		jitter = jitter + (diff-jitter)/16.0
+	}
+	stats.JitterRFC3550Ms = jitter
 
 	return stats
 
