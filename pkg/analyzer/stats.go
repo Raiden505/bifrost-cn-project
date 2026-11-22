@@ -3,6 +3,7 @@ package analyzer
 import (
 	"bifrost/pkg/models"
 	"math"
+	"slices"
 )
 
 func CalculateStats(cfg models.TestConfig, raw models.RawTestOutput) models.ComputedStats {
@@ -74,6 +75,12 @@ func CalculateStats(cfg models.TestConfig, raw models.RawTestOutput) models.Comp
 			varianceSum = varianceSum + (diff * diff)
 		}
 		stats.RTTStdDevMs = math.Sqrt(varianceSum / float64(len(validRTTs)))
+
+		slices.Sort(validRTTs)
+		stats.RTTMinMs = validRTTs[0]
+		stats.RTTMaxMs = validRTTs[len(validRTTs)-1]
+		stats.RTTMedianMs = validRTTs[len(validRTTs)/2]
+		stats.RTTP95Ms = validRTTs[int(float64(len(validRTTs))*0.95)]
 
 	}
 
