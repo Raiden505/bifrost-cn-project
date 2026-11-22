@@ -61,12 +61,19 @@ func CalculateStats(cfg models.TestConfig, raw models.RawTestOutput) models.Comp
 	stats.JitterRFC3550Ms = jitter
 
 	var RTTSum float64
+	var varianceSum float64
 
 	if len(validRTTs) > 0 {
 		for i := range len(validRTTs) {
 			RTTSum = RTTSum + validRTTs[i]
 		}
 		stats.RTTMeanMs = RTTSum / float64(len(validRTTs))
+
+		for i := range len(validRTTs) {
+			diff := validRTTs[i] - stats.RTTMeanMs
+			varianceSum = varianceSum + (diff * diff)
+		}
+		stats.RTTStdDevMs = math.Sqrt(varianceSum / float64(len(validRTTs)))
 
 	}
 
