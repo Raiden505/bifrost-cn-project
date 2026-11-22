@@ -19,6 +19,31 @@ func CalculateStats(cfg models.TestConfig, raw models.RawTestOutput) models.Comp
 		stats.CapacityUtilization = (stats.GoodputMbps / cfg.LinkCapacityMbps) * 100.0
 	}
 
+	stats.ProbesSent = len(raw.UDPSamples)
+
+	var validRTTs []float64
+	var idleSum, loadedSum float64
+	var idleCount, loadedCount int
+
+	for _, sample := range raw.UDPSamples {
+		if sample.Lost {
+			continue
+		}
+
+		validRTTs = append(validRTTs, sample.RTTMs)
+
+		if sample.Phase == "idle" {
+			idleSum = idleSum + sample.RTTMs
+			idleCount++
+		}
+
+		if sample.Phase == "loaded" {
+			loadedSum = loadedSum + sample.RTTMs
+			loadedCount++
+		}
+
+	}
+
 	return stats
 
 }
