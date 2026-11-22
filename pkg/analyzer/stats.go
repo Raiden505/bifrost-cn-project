@@ -84,6 +84,18 @@ func CalculateStats(cfg models.TestConfig, raw models.RawTestOutput) models.Comp
 
 	}
 
+	if idleCount > 0 {
+		stats.IdleMeanRTTMs = idleSum / float64(idleCount)
+	}
+
+	if loadedCount > 0 {
+		stats.LoadedMeanRTTMs = loadedSum / float64(loadedCount)
+	}
+
+	if idleCount > 0 && loadedCount > 0 {
+		stats.QueueingInflationMs = stats.LoadedMeanRTTMs - stats.IdleMeanRTTMs
+	}
+
 	return stats
 
 }
