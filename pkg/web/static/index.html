@@ -4,35 +4,169 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bifrost</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  html, body { min-height: 100%; }
+  body { background-color: #557b82; color: #fff; }
+
+  /* Readable dark panels (replaces the washed-out bg-white/10 boxes) */
+  .bf-panel {
+    background: rgba(12, 32, 40, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  /* From Uiverse.io by liyaxu123 - https://uiverse.io/liyaxu123/warm-eel-62
+     MIT License, Copyright (c) liyaxu123 (????)
+     Adapted: scoped with the bf- prefix, full-width, and the label also floats for
+     selects and for any non-empty field (:placeholder-shown) instead of :valid. */
+  .bf-field { position: relative; margin: 30px 0 0; width: 100%; }
+  .bf-field input,
+  .bf-field select {
+    background-color: transparent;
+    border: 0;
+    border-bottom: 2px #fff solid;
+    border-radius: 0;
+    display: block;
+    width: 100%;
+    padding: 15px 0;
+    font-size: 18px;
+    color: #fff;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+  }
+  .bf-field input::-webkit-outer-spin-button,
+  .bf-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .bf-field input::placeholder { color: transparent; }
+  .bf-field select { cursor: pointer; padding-right: 24px; }
+  .bf-field select option { color: #111; background: #fff; }
+  .bf-field .bf-arrow {
+    position: absolute; right: 2px; bottom: 22px; width: 8px; height: 8px;
+    border-right: 2px solid #fff; border-bottom: 2px solid #fff;
+    transform: rotate(45deg); pointer-events: none;
+  }
+  .bf-field input:focus,
+  .bf-field select:focus,
+  .bf-field input:not(:placeholder-shown),
+  .bf-field select {
+    outline: 0;
+    border-bottom-color: lightblue;
+  }
+  .bf-field input:focus-visible,
+  .bf-field select:focus-visible { border-bottom-color: #fff; }
+  .bf-field label {
+    position: absolute; top: 15px; left: 0; pointer-events: none;
+  }
+  .bf-field label span {
+    display: inline-block; font-size: 18px; min-width: 5px; color: #fff;
+    transition: 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+  .bf-field input:focus + label span,
+  .bf-field input:not(:placeholder-shown) + label span,
+  .bf-field select + label span {
+    color: lightblue;
+    transform: translateY(-30px);
+  }
+  .bf-field input:disabled, .bf-field select:disabled { opacity: .6; }
+
+  /* From Uiverse.io by kennyotsu - https://uiverse.io/kennyotsu/fresh-lizard-20
+     MIT License, Copyright (c) kennyotsu (kotsu)
+     Adapted: scoped with the bf- prefix, shown as a full-screen gradient overlay. */
+  .bf-overlay {
+    display: none; position: fixed; inset: 0; z-index: 50;
+    align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #30506b, #79b1bb);
+  }
+  .bf-overlay.on { display: flex; }
+  .bf-card {
+    --bg-color: #111;
+    background-color: var(--bg-color);
+    padding: 1rem 2rem;
+    border-radius: 1.25rem;
+  }
+  .bf-loader {
+    color: rgb(124, 124, 124);
+    font-family: "Poppins", sans-serif;
+    font-weight: 500;
+    font-size: 25px;
+    box-sizing: content-box;
+    height: 40px;
+    padding: 10px 10px;
+    display: flex;
+    border-radius: 8px;
+  }
+  .bf-words { overflow: hidden; position: relative; }
+  .bf-words::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(var(--bg-color) 10%, transparent 30%, transparent 70%, var(--bg-color) 90%);
+    z-index: 20;
+  }
+  .bf-word {
+    display: block; height: 100%; padding-left: 6px; color: #956afa;
+    animation: bf-spin 4s infinite;
+  }
+  @keyframes bf-spin {
+    10% { transform: translateY(-102%); }
+    25% { transform: translateY(-100%); }
+    35% { transform: translateY(-202%); }
+    50% { transform: translateY(-200%); }
+    60% { transform: translateY(-302%); }
+    75% { transform: translateY(-300%); }
+    85% { transform: translateY(-402%); }
+    100% { transform: translateY(-400%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bf-field label span { transition: none; }
+  }
+</style>
 </head>
-<body class="bg-slate-50 text-slate-800">
-<main class="max-w-6xl mx-auto p-6 space-y-6">
+<body>
+
+<!-- Loading screen: replaces the page while a test runs -->
+<div id="loading" class="bf-overlay" role="status" aria-live="polite" aria-label="Running diagnostic test">
+  <div class="bf-card">
+    <div class="bf-loader">
+      <p>running</p>
+      <div class="bf-words">
+        <span class="bf-word">latency</span>
+        <span class="bf-word">jitter</span>
+        <span class="bf-word">packet loss</span>
+        <span class="bf-word">goodput</span>
+        <span class="bf-word">latency</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="max-w-6xl mx-auto p-6 space-y-8">
 
   <h1 class="text-2xl font-semibold">Bifrost network diagnostics</h1>
 
   <!-- Controls -->
-  <section class="bg-white border border-slate-200 rounded-lg p-4">
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
-      <div>
-        <label for="server_ip" class="block text-xs text-slate-500 mb-1">Server IP</label>
-        <input id="server_ip" type="text" value="10.0.0.2"
-               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+  <section class="bf-panel rounded-lg p-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-2">
+      <div class="bf-field">
+        <input id="server_ip" type="text" value="10.0.0.2" placeholder=" " autocomplete="off" required>
+        <label for="server_ip" data-label="Server IP"></label>
       </div>
-      <div>
-        <label for="duration" class="block text-xs text-slate-500 mb-1">Duration (s)</label>
-        <input id="duration" type="number" min="1" max="60" value="5"
-               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+      <div class="bf-field">
+        <input id="duration" type="number" min="1" max="60" value="5" placeholder=" " required>
+        <label for="duration" data-label="Duration (s)"></label>
       </div>
-      <div>
-        <label for="capacity" class="block text-xs text-slate-500 mb-1">Reference capacity (Mbps)</label>
-        <input id="capacity" type="number" min="1" value="100"
-               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+      <div class="bf-field">
+        <input id="capacity" type="number" min="1" value="100" placeholder=" " required>
+        <label for="capacity" data-label="Capacity (Mbps)"></label>
       </div>
-      <div>
-        <label for="impairment" class="block text-xs text-slate-500 mb-1">Network impairment</label>
-        <select id="impairment" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm bg-white">
+      <div class="bf-field">
+        <select id="impairment">
           <option value="none">None (baseline)</option>
           <option value="rate10">10 Mbps cap</option>
           <option value="delay50">50 ms delay</option>
@@ -40,26 +174,30 @@
           <option value="congestion">Congestion</option>
           <option value="bufferbloat">Bufferbloat</option>
         </select>
+        <label for="impairment" data-label="Network impairment"></label>
+        <span class="bf-arrow" aria-hidden="true"></span>
       </div>
-      <label class="flex items-center gap-2 text-sm pb-1.5">
-        <input id="bufferbloat" type="checkbox" class="h-4 w-4">
-        Bufferbloat mode (idle vs loaded)
-      </label>
     </div>
-    <div class="flex gap-3 mt-4">
+
+    <label class="flex items-center gap-2 text-sm mt-6 cursor-pointer w-fit">
+      <input id="bufferbloat" type="checkbox" class="h-4 w-4 accent-sky-200">
+      Bufferbloat mode (idle vs loaded)
+    </label>
+
+    <div class="flex gap-3 mt-6">
       <button id="run" type="button"
               class="bg-slate-900 text-white text-sm px-4 py-2 rounded hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">
         Run diagnostic test
       </button>
       <button id="download" type="button" disabled
-              class="border border-slate-300 text-sm px-4 py-2 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed">
+              class="border border-white/40 text-sm px-4 py-2 rounded hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed">
         Download JSON
       </button>
     </div>
-    <p id="error" class="hidden mt-3 text-sm text-rose-700"></p>
+    <p id="error" class="hidden mt-3 text-sm text-rose-200 bg-rose-900/40 rounded px-3 py-2"></p>
   </section>
 
-  <p id="empty" class="text-sm text-slate-500">No results yet. Run a test to see the report.</p>
+  <p id="empty" class="text-sm text-slate-200">No results yet. Run a test to see the report.</p>
 
   <!-- Results, hidden until the first report arrives -->
   <div id="results" class="hidden space-y-6">
@@ -71,55 +209,73 @@
     </section>
 
     <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-white border border-slate-200 rounded-lg p-4">
-        <p class="text-xs text-slate-500">Application goodput</p>
-        <p class="text-2xl font-semibold mt-1"><span id="goodput">-</span> <span class="text-sm font-normal text-slate-500">Mbps</span></p>
-        <p id="goodput_sub" class="text-xs text-slate-500 mt-2"></p>
+      <div class="bf-panel rounded-lg p-4">
+        <p class="text-xs text-slate-200">Application goodput</p>
+        <p class="text-2xl font-semibold mt-1"><span id="goodput">-</span> <span class="text-sm font-normal text-slate-200">Mbps</span></p>
+        <p id="goodput_sub" class="text-xs text-slate-200 mt-2"></p>
       </div>
-      <div class="bg-white border border-slate-200 rounded-lg p-4">
-        <p class="text-xs text-slate-500">Round-trip time (mean)</p>
-        <p class="text-2xl font-semibold mt-1"><span id="rtt">-</span> <span class="text-sm font-normal text-slate-500">ms</span></p>
-        <p id="rtt_sub" class="text-xs text-slate-500 mt-2"></p>
+      <div class="bf-panel rounded-lg p-4">
+        <p class="text-xs text-slate-200">Round-trip time (mean)</p>
+        <p class="text-2xl font-semibold mt-1"><span id="rtt">-</span> <span class="text-sm font-normal text-slate-200">ms</span></p>
+        <p id="rtt_sub" class="text-xs text-slate-200 mt-2"></p>
       </div>
-      <div class="bg-white border border-slate-200 rounded-lg p-4">
-        <p class="text-xs text-slate-500">Jitter (RFC 3550)</p>
-        <p class="text-2xl font-semibold mt-1"><span id="jitter">-</span> <span class="text-sm font-normal text-slate-500">ms</span></p>
-        <p id="jitter_sub" class="text-xs text-slate-500 mt-2"></p>
+      <div class="bf-panel rounded-lg p-4">
+        <p class="text-xs text-slate-200">Jitter (RFC 3550)</p>
+        <p class="text-2xl font-semibold mt-1"><span id="jitter">-</span> <span class="text-sm font-normal text-slate-200">ms</span></p>
+        <p id="jitter_sub" class="text-xs text-slate-200 mt-2"></p>
       </div>
-      <div class="bg-white border border-slate-200 rounded-lg p-4">
-        <p class="text-xs text-slate-500">UDP probe loss</p>
-        <p class="text-2xl font-semibold mt-1"><span id="loss">-</span> <span class="text-sm font-normal text-slate-500">%</span></p>
-        <p id="loss_sub" class="text-xs text-slate-500 mt-2"></p>
+      <div class="bf-panel rounded-lg p-4">
+        <p class="text-xs text-slate-200">UDP probe loss</p>
+        <p class="text-2xl font-semibold mt-1"><span id="loss">-</span> <span class="text-sm font-normal text-slate-200">%</span></p>
+        <p id="loss_sub" class="text-xs text-slate-200 mt-2"></p>
       </div>
     </section>
 
     <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <div class="bf-panel rounded-lg p-4">
         <h3 class="text-sm font-medium mb-2">RTT per probe (ms)</h3>
         <div class="relative h-64"><canvas id="rttChart"></canvas></div>
       </div>
-      <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <div class="bf-panel rounded-lg p-4">
         <h3 class="text-sm font-medium mb-2">TCP goodput over time (Mbps)</h3>
         <div class="relative h-64"><canvas id="tcpChart"></canvas></div>
       </div>
     </section>
 
-    <p id="timestamp" class="text-xs text-slate-400"></p>
+    <p id="timestamp" class="text-xs text-slate-300"></p>
   </div>
 </main>
 
 <script>
 const $ = (id) => document.getElementById(id);
 
+// The loading screen stays up for at least this long (2000-3000 ms works well).
+const MIN_LOADING_MS = 2500;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 let lastReport = null;
 let rttChart = null;
 let tcpChart = null;
 
+// Chart.js defaults tuned for the dark panels
+Chart.defaults.color = "#f1f5f9";
+Chart.defaults.borderColor = "rgba(255, 255, 255, 0.2)";
+
 const BANNER_STYLES = {
-  healthy:  "bg-emerald-50 border-emerald-500 text-emerald-900",
-  warning:  "bg-amber-50 border-amber-500 text-amber-900",
-  critical: "bg-rose-50 border-rose-500 text-rose-900",
+  healthy:  "bg-emerald-950/85 border-emerald-400 text-white",
+  warning:  "bg-amber-950/85 border-amber-400 text-white",
+  critical: "bg-rose-950/85 border-rose-400 text-white",
 };
+
+// Builds the per-letter spans for the floating labels (staggered 50ms per letter).
+document.querySelectorAll(".bf-field label[data-label]").forEach((label) => {
+  [...label.dataset.label].forEach((ch, i) => {
+    const span = document.createElement("span");
+    span.style.transitionDelay = i * 50 + "ms";
+    span.textContent = ch === " " ? "\u00A0" : ch;
+    label.appendChild(span);
+  });
+});
 
 // Formats a number, or shows "-" if the value is missing.
 function fmt(v, digits = 1) {
@@ -127,11 +283,13 @@ function fmt(v, digits = 1) {
 }
 
 function readConfig() {
-  const duration = parseInt($("duration").value, 10);
+  let duration = parseInt($("duration").value, 10);
+  if (!(duration > 0)) duration = 5;
+  duration = Math.min(duration, 60);
   const capacity = parseFloat($("capacity").value);
   return {
     server_ip: $("server_ip").value.trim() || "10.0.0.2",
-    duration_sec: duration > 0 ? duration : 5,
+    duration_sec: duration,
     probe_interval_ms: 20,
     link_capacity_mbps: capacity > 0 ? capacity : 100,
     bufferbloat_mode: $("bufferbloat").checked,
@@ -142,6 +300,8 @@ function readConfig() {
 function setBusy(busy) {
   $("run").disabled = busy;
   $("run").textContent = busy ? "Running..." : "Run diagnostic test";
+  $("loading").classList.toggle("on", busy);
+  document.body.style.overflow = busy ? "hidden" : "";
 }
 
 function showError(msg) {
@@ -157,21 +317,27 @@ async function runTest() {
   setBusy(true);
   hideError();
   try {
-    const res = await fetch("/api/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(readConfig()),
-    });
+    // Run the request and the minimum-delay timer together: the overlay stays
+    // for at least MIN_LOADING_MS, and no longer than the test itself needs.
+    const [res] = await Promise.all([
+      fetch("/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(readConfig()),
+      }),
+      sleep(MIN_LOADING_MS),
+    ]);
     if (!res.ok) {
       const text = (await res.text()).trim();
       throw new Error(text || "Server returned status " + res.status);
     }
     lastReport = await res.json();
-    render(lastReport);
-  } catch (err) {
-    showError("Test failed: " + err.message);
-  } finally {
     setBusy(false);
+    render(lastReport);
+    $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (err) {
+    setBusy(false);
+    showError("Test failed: " + err.message);
   }
 }
 
@@ -228,7 +394,7 @@ function drawRttChart(samples) {
   const received = samples.filter((s) => !s.lost);
   const byPhase = (phase) =>
     received.filter((s) => s.phase === phase).map((s) => ({ x: s.seq_num, y: s.rtt_ms }));
-  // Lost packets have rtt_ms = 0, so they are drawn as red crosses on the x-axis.
+  // Lost packets have rtt_ms = 0, so they are drawn as crosses on the x-axis.
   const lost = samples.filter((s) => s.lost).map((s) => ({ x: s.seq_num, y: 0 }));
 
   const points = (label, data, color, extra) => Object.assign({
@@ -240,12 +406,12 @@ function drawRttChart(samples) {
     {
       label: "Trend",
       data: received.map((s) => ({ x: s.seq_num, y: s.rtt_ms })),
-      borderColor: "#cbd5e1", borderWidth: 1, pointRadius: 0,
+      borderColor: "rgba(255, 255, 255, 0.35)", borderWidth: 1, pointRadius: 0,
     },
-    points("Normal", byPhase("normal"), "#64748b"),
-    points("Idle", byPhase("idle"), "#3b82f6"),
-    points("Loaded", byPhase("loaded"), "#f97316"),
-    points("Lost", lost, "#e11d48", { pointStyle: "crossRot", pointRadius: 6, borderWidth: 2 }),
+    points("Normal", byPhase("normal"), "#e2e8f0"),
+    points("Idle", byPhase("idle"), "#7dd3fc"),
+    points("Loaded", byPhase("loaded"), "#fdba74"),
+    points("Lost", lost, "#fda4af", { pointStyle: "crossRot", pointRadius: 6, borderWidth: 2 }),
   ];
 
   if (rttChart) rttChart.destroy();
@@ -279,8 +445,8 @@ function drawTcpChart(intervals) {
       datasets: [{
         label: "Goodput (Mbps)",
         data: intervals.map((i) => ({ x: i.elapsed_sec, y: i.goodput_mbps })),
-        borderColor: "#0f172a",
-        backgroundColor: "rgba(15, 23, 42, 0.1)",
+        borderColor: "#ffffff",
+        backgroundColor: "rgba(255, 255, 255, 0.15)",
         fill: true,
         tension: 0.2,
         pointRadius: 3,
